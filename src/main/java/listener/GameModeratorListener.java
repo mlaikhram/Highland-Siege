@@ -1,6 +1,7 @@
 package listener;
 
 import config.YmlConfig;
+import game.*;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
@@ -32,8 +33,31 @@ public class GameModeratorListener extends ListenerAdapter {
             return;
         }
         MessageChannel sourceChannel = event.getChannel();
-        String[][] board = EmojiUtils.generateEmptyBoardEmojis(8, 18);
-        sourceChannel.sendMessage(EmojiUtils.generateGameBoardMessage(64, "PeaQueueAre", "Kiloechovin", board)).queue();
+
+        Board board = new Board();
+
+        board.applyMove(new Move(board.getPieces(Side.FRIENDLY).get(PieceType.SNIPER), new Position(5, 1)));
+        board.applyMove(new Move(board.getPieces(Side.FRIENDLY).get(PieceType.ASSASSIN), new Position(6, 1)));
+        board.applyMove(new Move(board.getPieces(Side.FRIENDLY).get(PieceType.MEDIC), new Position(7, 1)));
+        board.applyMove(new Move(board.getPieces(Side.FRIENDLY).get(PieceType.PALADIN), new Position(0, 0)));
+        board.applyMove(new Move(board.getPieces(Side.FRIENDLY).get(PieceType.SCOUT), new Position(2, 0)));
+        board.applyMove(new Move(board.getPieces(Side.FRIENDLY).get(PieceType.BEAST), new Position(7, 0)));
+
+        board.applyMove(new Move(board.getPieces(Side.ENEMY).get(PieceType.SNIPER), new Position(5, 17)));
+        board.applyMove(new Move(board.getPieces(Side.ENEMY).get(PieceType.ASSASSIN), new Position(5, 5)));
+        board.applyMove(new Move(board.getPieces(Side.ENEMY).get(PieceType.MEDIC), new Position(6, 2)));
+        board.applyMove(new Move(board.getPieces(Side.ENEMY).get(PieceType.PALADIN), new Position(2, 5)));
+        board.applyMove(new Move(board.getPieces(Side.ENEMY).get(PieceType.SCOUT), new Position(2, 4)));
+        board.applyMove(new Move(board.getPieces(Side.ENEMY).get(PieceType.BEAST), new Position(7, 16)));
+
+        try {
+            board.applyMove(new Move(board, Side.FRIENDLY, "Sniper", "to", "J4"));
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        sourceChannel.sendMessage(EmojiUtils.generateBoardMessage(board)).queue();
     }
 
 

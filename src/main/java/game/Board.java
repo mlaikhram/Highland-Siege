@@ -12,12 +12,12 @@ public class Board {
 
     private static final Logger logger = LoggerFactory.getLogger(Board.class);
 
-    private static final int WIDTH = 8;
-    private static final int HEIGHT = 18;
-    private static final int BANNER_SIZE = 64;
+    public static final int WIDTH = 8;
+    public static final int HEIGHT = 18;
+    public static final int BANNER_SIZE = 61;
     private static final Position DOUBLED_CENTER = new Position(7, 17); // TODO: remove since it is just WIDTH-1 and HEIGHT-1
 
-    private static final List<List<Position>> CAPTURE_POINT_POSITIONS = Arrays.asList(
+    public static final List<List<Position>> CAPTURE_POINT_POSITIONS = Arrays.asList(
             Arrays.asList(
                     new Position(3, 0),
                     new Position(4, 0),
@@ -154,16 +154,16 @@ public class Board {
         return Stream.concat(friendlyPieces.values().stream(), enemyPieces.values().stream()).filter((piece) -> piece.getPosition() != null && piece.isActive() && piece.getPosition().getX() == x && piece.getPosition().getY() == y).findFirst().orElse(null);
     }
 
-    public Collection<Piece> getPieces(Side side) {
+    public Map<PieceType, Piece> getPieces(Side side) {
         switch (side) {
             case FRIENDLY:
-                return friendlyPieces.values();
+                return friendlyPieces;
 
             case ENEMY:
-                return enemyPieces.values();
+                return enemyPieces;
 
             default:
-                return new HashSet<>();
+                return new HashMap<>();
         }
     }
 

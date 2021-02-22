@@ -27,7 +27,7 @@ public class Piece {
             case ASSASSIN:
                 moves.addAll(getBasicMoves(board, 2));
 
-                for (Piece piece : board.getPieces(side == Side.FRIENDLY ? Side.ENEMY : Side.FRIENDLY)) {
+                for (Piece piece : board.getPieces(side == Side.FRIENDLY ? Side.ENEMY : Side.FRIENDLY).values()) {
                     if (Math.abs(piece.getPosition().getX() - position.getX()) == Math.abs(piece.getPosition().getY() - position.getY())) {
                         moves.add(new Move(this, piece.getPosition()));
                     }
@@ -37,7 +37,7 @@ public class Piece {
             case BEAST:
                 moves.addAll(getBasicMoves(board, 2));
 
-                for (Piece piece : board.getPieces(side == Side.FRIENDLY ? Side.ENEMY : Side.FRIENDLY)) {
+                for (Piece piece : board.getPieces(side == Side.FRIENDLY ? Side.ENEMY : Side.FRIENDLY).values()) {
                     if (piece.getPosition().isInSquare(position, 2)) {
                         moves.add(new Move(this, piece.getPosition()));
                     }
