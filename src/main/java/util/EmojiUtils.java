@@ -6,6 +6,9 @@ import java.util.Map;
 
 public class EmojiUtils {
 
+    public static final String CONFIRM = "\u2705";
+    public static final String CANCEL = "\u274E";
+
     public static final String RED_SQUARE = "\uD83D\uDFE5";
     public static final String WHITE_SQUARE = "\u2B1C";
     public static final String BLUE_SQUARE = "\uD83D\uDFE6";

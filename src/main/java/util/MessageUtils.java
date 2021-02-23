@@ -17,5 +17,7 @@ public class MessageUtils {
         return mention.replaceAll("!", "").matches(ID_REGEX);
     }
 
+    public static final String REGISTRATION_MESSAGE = " was successfully registered! Please wait for an admin to verify your bot so you can use it in competitions!";
+
     public static final String HELP_TEXT = "ask later";
 }
