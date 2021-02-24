@@ -1,6 +1,6 @@
-package util;
+package moderator.util;
 
-import game.SpecialChannelType;
+import game.enums.SpecialChannelType;
 
 import java.io.File;
 import java.sql.*;
@@ -43,11 +43,10 @@ public class DBUtils {
         }
     }
 
-    public static boolean isBotValid(long botId, long coachId) throws Exception {
+    public static boolean isBotVerified(long botId) throws Exception {
         try (Connection connection = DriverManager.getConnection(connectionString)) {
-            PreparedStatement statement = connection.prepareStatement("SELECT * FROM bots WHERE bot_id=? AND coach_id=? AND status='verified'");
+            PreparedStatement statement = connection.prepareStatement("SELECT * FROM bots WHERE bot_id=? AND status='verified'");
             statement.setLong(1, botId);
-            statement.setLong(2, coachId);
             ResultSet resultSet = statement.executeQuery();
             return resultSet.next();
         }

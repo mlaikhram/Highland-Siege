@@ -1,7 +1,10 @@
-package game;
+package game.playables;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import game.enums.Phase;
+import game.enums.PieceType;
+import game.enums.Side;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

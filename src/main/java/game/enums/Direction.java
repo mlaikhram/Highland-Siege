@@ -1,4 +1,6 @@
-package game;
+package game.enums;
+
+import game.playables.Position;
 
 public enum Direction {
     N(new Position(0, 1)),

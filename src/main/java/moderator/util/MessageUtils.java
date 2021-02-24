@@ -1,4 +1,4 @@
-package util;
+package moderator.util;
 
 public class MessageUtils {
 
@@ -18,6 +18,7 @@ public class MessageUtils {
     }
 
     public static final String REGISTRATION_MESSAGE = " was successfully registered! Please wait for an admin to verify your bot so you can use it in competitions!";
+    public static final String ARENA_REQUEST_MESSAGE = "Waiting on confirmation from BOTH players and/or coaches to begin!";
 
     public static final String HELP_TEXT = "ask later";
 }

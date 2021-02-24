@@ -1,6 +1,8 @@
-package game;
+package game.playables;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import game.enums.PieceType;
+import game.enums.Side;
 
 import java.util.Objects;
 

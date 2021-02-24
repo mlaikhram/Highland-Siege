@@ -1,6 +1,10 @@
-package util;
+package moderator.util;
 
-import game.*;
+import game.enums.Phase;
+import game.enums.PieceType;
+import game.enums.Side;
+import game.playables.Board;
+import game.playables.Piece;
 
 import java.util.Map;
 
@@ -58,7 +62,7 @@ public class EmojiUtils {
             Phase.SURVIVE, "\u2620\uFE0F"
     );
 
-    public static String generateBoardMessage(Board board, String bluePlayerName, String redPlayerName) {
+    public static String generateBoardMessage(Board board, String bluePlayerName, String redPlayerName, Side activeSide) {
         String[][] boardArr = generateEmptyBoardEmojis();
         // place capture points
         for (int i = 0; i < board.getCapturePoints().size(); ++i) {
@@ -85,11 +89,13 @@ public class EmojiUtils {
         // place alive pieces
         for (Side side : Side.values()) {
             for (Piece piece : board.getPieces(side).values()) {
-                boardArr[piece.getPosition().getX()][piece.getPosition().getY()] = PIECE_EMOJIS.get(piece.getType()).get(side);
+                if (piece.getPosition() != null) {
+                    boardArr[piece.getPosition().getX()][piece.getPosition().getY()] = PIECE_EMOJIS.get(piece.getType()).get(side);
+                }
             }
         }
         // TODO: place previous move tiles
-        return generateGameBoardMessage(bluePlayerName, redPlayerName, boardArr, board.getPhase());
+        return generateGameBoardMessage(bluePlayerName, redPlayerName, boardArr, board.getPhase(), activeSide);
     }
 
     private static String[][] generateEmptyBoardEmojis() {
@@ -102,13 +108,13 @@ public class EmojiUtils {
         return board;
     }
 
-    private static String generateGameBoardMessage(String bluePlayer, String redPlayer, String[][] board, Phase phase) {
+    private static String generateGameBoardMessage(String bluePlayer, String redPlayer, String[][] board, Phase phase, Side activeSide) {
         StringBuilder message = new StringBuilder();
         message.append('`');
         message.append("   ");
-        message.append(bluePlayer);
-        message.append(" ".repeat(Board.BANNER_SIZE - bluePlayer.length() - redPlayer.length()));
-        message.append(redPlayer);
+        message.append(bluePlayer + (activeSide == Side.FRIENDLY ? "*" : ""));
+        message.append(" ".repeat(Board.BANNER_SIZE - bluePlayer.length() - redPlayer.length() - 1));
+        message.append((activeSide == Side.ENEMY ? "*" : "") + redPlayer);
         message.append('`');
         message.append('\n');
         message.append(PHASE_EMOJIS.get(phase));
@@ -124,6 +130,6 @@ public class EmojiUtils {
 
     public static void main(String[] args) {
         String[][] board = generateEmptyBoardEmojis();
-        System.out.println(generateGameBoardMessage("PeaQueueAre", "Kiloechovin", board, Phase.SURVIVE));
+        System.out.println(generateGameBoardMessage("PeaQueueAre", "Kiloechovin", board, Phase.SURVIVE, Side.FRIENDLY));
     }
 }

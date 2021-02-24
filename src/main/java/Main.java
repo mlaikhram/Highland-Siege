@@ -1,11 +1,11 @@
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import config.YmlConfig;
-import listener.GameModeratorListener;
+import moderator.listener.GameModeratorListener;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Activity;
-import util.DBUtils;
+import moderator.util.DBUtils;
 
 import java.io.File;
 

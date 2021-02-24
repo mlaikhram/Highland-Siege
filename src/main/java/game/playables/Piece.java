@@ -1,5 +1,8 @@
-package game;
+package game.playables;
 
+import game.enums.Direction;
+import game.enums.PieceType;
+import game.enums.Side;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
