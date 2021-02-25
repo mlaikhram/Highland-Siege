@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class Board {
@@ -69,11 +70,31 @@ public class Board {
         this.turnCount = 0;
     }
 
+    public Board rotated() {
+        // rotate pieces on board [P(x,y) --> P'(-x+2x_O,-y+2y_O)] -3,-1 -> 1,-1 about -1,-1
+        // flip Enemy <-> Friendly
+        // flip capturePoints and captureForce
+        Board rotatedBoard = new Board();
+        rotatedBoard.phase = phase;
+        rotatedBoard.turnCount = turnCount;
+        for (PieceType pieceType : PieceType.values()) {
+            rotatedBoard.friendlyPieces.get(pieceType).setActive(enemyPieces.get(pieceType).isActive());
+            rotatedBoard.friendlyPieces.get(pieceType).setPosition(enemyPieces.get(pieceType).getPosition() == null ? null : enemyPieces.get(pieceType).getPosition().rotated());
+
+            rotatedBoard.enemyPieces.get(pieceType).setActive(friendlyPieces.get(pieceType).isActive());
+            rotatedBoard.enemyPieces.get(pieceType).setPosition(friendlyPieces.get(pieceType).getPosition() == null ? null : friendlyPieces.get(pieceType).getPosition().rotated());
+        }
+        rotatedBoard.captureForce = -captureForce;
+        for (int i = 0; i < capturePoints.size(); ++i) {
+            rotatedBoard.capturePoints.set(i, capturePoints.get(capturePoints.size() - 1 - i));
+        }
+        return rotatedBoard;
+    }
+
     public Set<Move> getPossibleMoves(Side side) {
         if (side == side.ENEMY) {
-            // TODO: rotate board
-            Board rotatedBoard = this;
-            return rotatedBoard.getPossibleMoves(side.FRIENDLY);
+            Board rotatedBoard = rotated();
+            return rotatedBoard.getPossibleMoves(side.FRIENDLY).stream().map(move ->  move.getRotated(this)).collect(Collectors.toSet());
         }
         else if (side == side.FRIENDLY) {
             Set<Move> moves = new HashSet<>();
@@ -98,15 +119,21 @@ public class Board {
                     if (!piece.isActive()) {
                         // allow respawn if in siege phase
                         if (phase == Phase.SIEGE) {
-                            int spawnCapturePoint = getBasePoint();
-                            for (int x = 0; x < WIDTH; ++x) {
-                                for (int y = 0; y < 2; ++y) {
-                                    Position spawnPosition = new Position(x, spawnCapturePoint * 4 + y);
-                                    if (isValidSpawnPosition(spawnPosition)) {
-                                        moves.add(new Move(piece, spawnPosition));
-                                    }
+                            int spawnCapturePointIndex = getBasePoint();
+                            for (Position position : CAPTURE_POINT_POSITIONS.get(spawnCapturePointIndex)) {
+                                if (isValidSpawnPosition(position)) {
+                                    moves.add(new Move(piece, position));
                                 }
                             }
+//                            for entire 2 rows of spawn point
+//                            for (int x = 0; x < WIDTH; ++x) {
+//                                for (int y = 0; y < 2; ++y) {
+//                                    Position spawnPosition = new Position(x, spawnCapturePoint * 4 + y);
+//                                    if (isValidSpawnPosition(spawnPosition)) {
+//                                        moves.add(new Move(piece, spawnPosition));
+//                                    }
+//                                }
+//                            }
                         }
                         // allow respawn if near medic
                         if (friendlyPieces.get(PieceType.MEDIC).isActive() && piece.getPosition().isAdjacent(friendlyPieces.get(PieceType.MEDIC).getPosition())) {
@@ -134,11 +161,13 @@ public class Board {
 
     public void applyMove(Move move) {
         move.getPiece().setActive(true);
-        Piece collision = getActivePieceAt(move.getNewPosition().getX(), move.getNewPosition().getY());
-        if (collision != null) {
-            collision.setActive(false);
+        if (!move.getNewPosition().equals(move.getPiece().getPosition())) {
+            Piece collision = getActivePieceAt(move.getNewPosition().getX(), move.getNewPosition().getY());
+            if (collision != null) {
+                collision.setActive(false);
+            }
+            move.getPiece().setPosition(move.getNewPosition());
         }
-        move.getPiece().setPosition(move.getNewPosition());
         if (move.getAttackPosition() != null) {
             Piece victim = getActivePieceAt(move.getAttackPosition().getX(), move.getAttackPosition().getY());
             if (victim != null) {
@@ -177,13 +206,7 @@ public class Board {
 
     public String toString(boolean rotate) {
         try {
-            if (rotate) {
-                // TODO: rotate pieces on board [P(x,y) --> P'(-x+2x_O,-y+2y_O)] -3,-1 -> 1,-1 about -1,-1
-
-                // flip Enemy <-> Friendly
-                // flip capturePoints and captureForce
-            }
-            return new ObjectMapper().writeValueAsString(this);
+            return new ObjectMapper().writeValueAsString(rotate ? rotated() : this);
         }
         catch (JsonProcessingException e) {
             logger.info(e.getMessage());

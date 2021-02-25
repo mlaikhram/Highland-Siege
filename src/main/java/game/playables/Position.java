@@ -12,6 +12,10 @@ public class Position {
         this.y = y;
     }
 
+    public Position rotated() {
+        return new Position(Board.WIDTH - 1 - x, Board.HEIGHT - 1 - y);
+    }
+
     public int getX() {
         return x;
     }

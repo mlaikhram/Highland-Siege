@@ -3,6 +3,7 @@ package moderator.listener;
 import config.YmlConfig;
 import game.enums.KeyRole;
 import game.enums.SpecialChannelType;
+import game.playables.Move;
 import moderator.GameSession;
 import moderator.Player;
 import net.dv8tion.jda.api.JDA;
@@ -20,6 +21,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -82,7 +84,42 @@ public class GameModeratorListener extends ListenerAdapter {
                 }
                 // TODO: make move from #arena
                 else if (sourceChannel.getIdLong() == DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.ARENA)) {
-                    eventMessage.delete().queue();
+                    GameSession session = sessions.get(guild.getIdLong());
+                    if (messageTokens.length == 3 && session != null && !session.isOver() && session.getActivePlayer().getId() == author.getIdLong()) {
+                        try {
+                            Move move = new Move(session.getBoard(), session.getActiveSide(), messageTokens[0], messageTokens[1], messageTokens[2]);
+                             if (session.tryMove(author.getIdLong(), move)) {
+                                 sourceChannel.editMessageById(session.getSessionMessageId(), session.getBoardAsEmojis(guild)).queue(message -> {
+                                     try {
+                                         if (session.getActivePlayer().isBot()) {
+                                             TextChannel plumbingChannel = guild.getTextChannelById(DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.PLUMBING));
+                                             plumbingChannel.sendMessage(jda.getUserById(session.getActivePlayer().getId()).getAsMention() + " " + session.getBoardAsJson()).queue();
+                                         }
+                                     }
+                                     catch (Exception e) {
+                                         e.printStackTrace();
+                                         logger.error(e.getMessage());
+                                     }
+                                     eventMessage.delete().queue();
+                                 });
+//                                 sourceChannel.sendMessage(session.getBoardAsEmojis(guild)).queue();
+                             }
+                             else {
+                                 eventMessage.addReaction(EmojiUtils.CANCEL).queue();
+                                 eventMessage.delete().queueAfter(3, TimeUnit.SECONDS);
+                             }
+                        }
+                        catch (Exception e) {
+                            e.printStackTrace();
+                            logger.info("invalid move: " + e.getMessage());
+                            eventMessage.addReaction(EmojiUtils.CANCEL).queue();
+                            eventMessage.delete().queueAfter(3, TimeUnit.SECONDS);
+                        }
+                    }
+                    else {
+                        eventMessage.addReaction(EmojiUtils.CANCEL).queue();
+                        eventMessage.delete().queueAfter(3, TimeUnit.SECONDS);
+                    }
                 }
                 // TODO: make move from #plumbing
                 else if (sourceChannel.getIdLong() == DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.PLUMBING)) {
@@ -210,7 +247,9 @@ public class GameModeratorListener extends ListenerAdapter {
                                                         guild.addRoleToMember(player.getId(), challengerRole).queue();
                                                     }
                                                 }
-                                                sourceChannel.sendMessage(session.getBoardAsEmojis(guild)).queue();
+                                                sourceChannel.sendMessage(session.getBoardAsEmojis(guild)).queue(initialMessage -> {
+                                                    session.setSessionMessageId(initialMessage.getIdLong());
+                                                });
                                                 if (session.getActivePlayer().isBot()) {
                                                     TextChannel plumbingChannel = guild.getTextChannelById(DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.PLUMBING));
                                                     plumbingChannel.sendMessage(jda.getUserById(session.getActivePlayer().getId()).getAsMention() + " " + session.getBoardAsJson()).queue();

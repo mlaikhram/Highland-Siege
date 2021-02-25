@@ -74,7 +74,7 @@ public class Piece {
                 break;
 
             case SCOUT:
-                int moveDistance = board.isAnyActiveAdjacent(this) ? 1 : 4;
+                int moveDistance = board.isAnyActiveAdjacent(this) ? 1 : 3;
                 moves.addAll(getBasicMoves(board, moveDistance));
                 break;
 

@@ -38,6 +38,14 @@ public class Move {
         this(piece, newPosition, null);
     }
 
+    public Move getRotated(Board board) {
+        return new Move(
+                piece.getSide() == Side.FRIENDLY ? board.getEnemyPieces().get(piece.getType()) : board.getFriendlyPieces().get(piece.getType()),
+                newPosition == null ? null : newPosition.rotated(),
+                attackPosition == null ? null : attackPosition.rotated()
+        );
+    }
+
     public Piece getPiece() {
         return piece;
     }
