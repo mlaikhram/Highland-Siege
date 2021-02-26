@@ -19,7 +19,6 @@ public class Board {
     public static final int WIDTH = 8;
     public static final int HEIGHT = 18;
     public static final int BANNER_SIZE = 61;
-    private static final Position DOUBLED_CENTER = new Position(7, 17); // TODO: remove since it is just WIDTH-1 and HEIGHT-1
 
     public static final List<List<Position>> CAPTURE_POINT_POSITIONS = Arrays.asList(
             Arrays.asList(
@@ -54,6 +53,8 @@ public class Board {
             )
     );
 
+    private final int CAPTURE_THRESHOLD = 15;
+
     private HashMap<PieceType, Piece> friendlyPieces;
     private HashMap<PieceType, Piece> enemyPieces;
     private List<Side> capturePoints;
@@ -73,7 +74,7 @@ public class Board {
     public Board rotated() {
         // rotate pieces on board [P(x,y) --> P'(-x+2x_O,-y+2y_O)] -3,-1 -> 1,-1 about -1,-1
         // flip Enemy <-> Friendly
-        // flip capturePoints and captureForce
+        // flip captureForce
         Board rotatedBoard = new Board();
         rotatedBoard.phase = phase;
         rotatedBoard.turnCount = turnCount;
@@ -85,9 +86,9 @@ public class Board {
             rotatedBoard.enemyPieces.get(pieceType).setPosition(friendlyPieces.get(pieceType).getPosition() == null ? null : friendlyPieces.get(pieceType).getPosition().rotated());
         }
         rotatedBoard.captureForce = -captureForce;
-        for (int i = 0; i < capturePoints.size(); ++i) {
-            rotatedBoard.capturePoints.set(i, capturePoints.get(capturePoints.size() - 1 - i));
-        }
+//        for (int i = 0; i < capturePoints.size(); ++i) {
+//            rotatedBoard.capturePoints.set(i, capturePoints.get(capturePoints.size() - 1 - i));
+//        }
         return rotatedBoard;
     }
 
@@ -114,26 +115,20 @@ public class Board {
                     }
                 }
             }
-            else {
+            else if (phase != Phase.END) {
                 for (Piece piece: friendlyPieces.values()) {
                     if (!piece.isActive()) {
                         // allow respawn if in siege phase
                         if (phase == Phase.SIEGE) {
                             int spawnCapturePointIndex = getBasePoint();
-                            for (Position position : CAPTURE_POINT_POSITIONS.get(spawnCapturePointIndex)) {
-                                if (isValidSpawnPosition(position)) {
-                                    moves.add(new Move(piece, position));
+                            logger.info("capture point: " + spawnCapturePointIndex);
+                            if (spawnCapturePointIndex >= 0) {
+                                for (Position position : CAPTURE_POINT_POSITIONS.get(spawnCapturePointIndex)) {
+                                    if (isValidSpawnPosition(position)) {
+                                        moves.add(new Move(piece, position));
+                                    }
                                 }
                             }
-//                            for entire 2 rows of spawn point
-//                            for (int x = 0; x < WIDTH; ++x) {
-//                                for (int y = 0; y < 2; ++y) {
-//                                    Position spawnPosition = new Position(x, spawnCapturePoint * 4 + y);
-//                                    if (isValidSpawnPosition(spawnPosition)) {
-//                                        moves.add(new Move(piece, spawnPosition));
-//                                    }
-//                                }
-//                            }
                         }
                         // allow respawn if near medic
                         if (friendlyPieces.get(PieceType.MEDIC).isActive() && piece.getPosition().isAdjacent(friendlyPieces.get(PieceType.MEDIC).getPosition())) {
@@ -178,7 +173,62 @@ public class Board {
             phase = Phase.SIEGE;
         }
         if (phase != Phase.SETUP) {
-            ++turnCount;
+            updateCaptureForce();
+            Side winner = getVictorySide();
+            logger.info("victory side: " + winner);
+            if (winner != Side.NEUTRAL) {
+                phase = Phase.END;
+            }
+            else {
+                ++turnCount;
+            }
+        }
+    }
+
+    public Side getVictorySide() {
+        if (!capturePoints.contains(Side.FRIENDLY) && (capturePoints.get(0) == Side.ENEMY || !friendlyPieces.values().stream().anyMatch(piece -> piece.isActive()))) {
+            return Side.ENEMY;
+        }
+        else if (!capturePoints.contains(Side.ENEMY) && (capturePoints.get(capturePoints.size() - 1) == Side.FRIENDLY || !enemyPieces.values().stream().anyMatch(piece -> piece.isActive()))) {
+            return Side.FRIENDLY;
+        }
+        return Side.NEUTRAL;
+    }
+
+    private void updateCaptureForce() {
+        int activeCapturePoint = capturePoints.indexOf(Side.NEUTRAL);
+        int friendlyCount = 0;
+        int enemyCount = 0;
+        for (Position position : CAPTURE_POINT_POSITIONS.get(activeCapturePoint)) {
+            Piece capturingPiece = getActivePieceAt(position.getX(), position.getY());
+            if (capturingPiece != null) {
+                if (capturingPiece.getSide() == Side.FRIENDLY) {
+                    ++friendlyCount;
+                }
+                else if (capturingPiece.getSide() == Side.ENEMY) {
+                    ++enemyCount;
+                }
+            }
+        }
+        if (friendlyCount > 0 && enemyCount == 0) {
+            captureForce += (captureForce >= 0 ? 1 : 2) * friendlyCount;
+            if (captureForce >= CAPTURE_THRESHOLD) {
+                capturePoints.set(activeCapturePoint, Side.FRIENDLY);
+                if (activeCapturePoint < capturePoints.size() - 1) {
+                    capturePoints.set(activeCapturePoint + 1, Side.NEUTRAL);
+                    captureForce = 0;
+                }
+            }
+        }
+        else if (enemyCount > 0 && friendlyCount == 0) {
+            captureForce -= (captureForce <= 0 ? 1 : 2) * enemyCount;
+            if (-captureForce >= CAPTURE_THRESHOLD) {
+                capturePoints.set(activeCapturePoint, Side.ENEMY);
+                if (activeCapturePoint > 0) {
+                    capturePoints.set(activeCapturePoint - 1, Side.NEUTRAL);
+                    captureForce = 0;
+                }
+            }
         }
     }
 
@@ -225,12 +275,12 @@ public class Board {
     // all below for friendly
 
     private int getBasePoint() {
-        for (int i = capturePoints.size(); i <= 0; --i) {
+        for (int i = capturePoints.size() - 1; i >= 0; --i) {
             if (capturePoints.get(i) == Side.FRIENDLY) {
                 return i;
             }
         }
-        return 0;
+        return -1;
     }
 
     public boolean isOnBoard(Position position) {
@@ -291,28 +341,5 @@ public class Board {
 
     public void setTurnCount(int turnCount) {
         this.turnCount = turnCount;
-    }
-
-    public static void main(String[] args) throws JsonProcessingException {
-        ObjectMapper mapper = new ObjectMapper();
-        Board board = new Board();
-
-        board.applyMove(new Move(board.friendlyPieces.get(PieceType.SNIPER), new Position(5, 1)));
-        board.applyMove(new Move(board.friendlyPieces.get(PieceType.ASSASSIN), new Position(6, 1)));
-        board.applyMove(new Move(board.friendlyPieces.get(PieceType.MEDIC), new Position(7, 1)));
-        board.applyMove(new Move(board.friendlyPieces.get(PieceType.PALADIN), new Position(0, 0)));
-        board.applyMove(new Move(board.friendlyPieces.get(PieceType.SCOUT), new Position(2, 0)));
-        board.applyMove(new Move(board.friendlyPieces.get(PieceType.BEAST), new Position(7, 0)));
-
-        board.applyMove(new Move(board.enemyPieces.get(PieceType.SNIPER), new Position(5, 17)));
-        board.applyMove(new Move(board.enemyPieces.get(PieceType.ASSASSIN), new Position(5, 5)));
-        board.applyMove(new Move(board.enemyPieces.get(PieceType.MEDIC), new Position(6, 2)));
-        board.applyMove(new Move(board.enemyPieces.get(PieceType.PALADIN), new Position(2, 5)));
-        board.applyMove(new Move(board.enemyPieces.get(PieceType.SCOUT), new Position(2, 4)));
-        board.applyMove(new Move(board.enemyPieces.get(PieceType.BEAST), new Position(7, 16)));
-
-        logger.info(mapper.writeValueAsString(board.friendlyPieces));
-        logger.info(board.toString());
-        logger.info(mapper.writeValueAsString(board.getPossibleMoves(Side.FRIENDLY).contains(new Move(board.friendlyPieces.get(PieceType.BEAST), new Position(6, 2)))));
     }
 }

@@ -1,6 +1,7 @@
 package moderator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import game.enums.Phase;
 import game.enums.Side;
 import game.playables.Board;
 import game.playables.Move;
@@ -13,18 +14,17 @@ import java.util.Random;
 
 public class GameSession {
 
-    private long sessionMessageId;
+    private long boardMessageId;
+    private long statusMessageId;
     private Board board;
     private HashMap<Side, Player> players;
     private Side activeSide;
-    private boolean isOver;
 
     public GameSession(Player friendlyPlayer, Player enemyPlayer) {
         players = new HashMap<>();
         players.put(Side.FRIENDLY, friendlyPlayer);
         players.put(Side.ENEMY, enemyPlayer);
         activeSide = Side.NEUTRAL;
-        isOver = false;
     }
 
     public void begin() {
@@ -32,16 +32,21 @@ public class GameSession {
         activeSide = new Random().nextBoolean() ? Side.FRIENDLY : Side.ENEMY;
     }
 
+    // TODO: convert to surrender button
     public void end() {
-        isOver = true;
+
     }
 
     public boolean tryMove(long playerId, Move move) throws Exception {
-        // TODO: if it is the current player's turn and the move is valid, apply the move
         System.out.println(new ObjectMapper().writeValueAsString(board.getPossibleMoves(activeSide)));
         if (getActivePlayer().getId() == playerId && board.getPossibleMoves(activeSide).contains(move)) {
             board.applyMove(move);
-            activeSide = activeSide == Side.FRIENDLY ? Side.ENEMY : Side.FRIENDLY;
+            if (board.getVictorySide() == Side.NEUTRAL) {
+                activeSide = activeSide == Side.FRIENDLY ? Side.ENEMY : Side.FRIENDLY;
+            }
+            else {
+                activeSide = Side.NEUTRAL;
+            }
             return true;
         }
         return false;
@@ -59,12 +64,16 @@ public class GameSession {
         return EmojiUtils.generateBoardMessage(board, guild.getMemberById(players.get(Side.FRIENDLY).getId()).getEffectiveName(), guild.getMemberById(players.get(Side.ENEMY).getId()).getEffectiveName(), activeSide);
     }
 
+    public String getStatusAsEmojis() {
+        return EmojiUtils.generateStatusMessage(board);
+    }
+
     public String getBoardAsJson() {
         return board.toString(activeSide == Side.ENEMY);
     }
 
     public boolean isOver() {
-        return isOver;
+        return board.getPhase() == Phase.END;
     }
 
     public Collection<Player> getPlayers() {
@@ -75,11 +84,19 @@ public class GameSession {
         return players.get(activeSide);
     }
 
-    public long getSessionMessageId() {
-        return sessionMessageId;
+    public long getBoardMessageId() {
+        return boardMessageId;
     }
 
-    public void setSessionMessageId(long sessionMessageId) {
-        this.sessionMessageId = sessionMessageId;
+    public void setBoardMessageId(long boardMessageId) {
+        this.boardMessageId = boardMessageId;
+    }
+
+    public long getStatusMessageId() {
+        return statusMessageId;
+    }
+
+    public void setStatusMessageId(long statusMessageId) {
+        this.statusMessageId = statusMessageId;
     }
 }

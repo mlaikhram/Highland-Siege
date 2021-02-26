@@ -61,7 +61,7 @@ public class Piece {
                 break;
 
             case PALADIN:
-                moves.addAll(getBasicMoves(board, Map.of(
+                moves.addAll(getBasicMoves(board, Map.of( // TODO: somehow can move 2 in diagonal
                         Direction.N, 2,
                         Direction.S, 1,
                         Direction.W, 1,
@@ -126,7 +126,7 @@ public class Piece {
         int i = 1;
         while (i <= ranges.values().stream().max(Integer::compare).get()) {
             for (Direction direction : ranges.keySet()) {
-                if (ranges.get(direction) > 0) {
+                if (i <= ranges.get(direction)) {
                     Position newPosition = position.add(direction.getPosition().scale(i));
                     Piece collision = board.getActivePieceAt(newPosition.getX(), newPosition.getY());
                     if (!board.isOnBoard(newPosition) || (collision != null && (collision.getSide() == side || (direction == Direction.N && collision.getType() == PieceType.PALADIN)))) {

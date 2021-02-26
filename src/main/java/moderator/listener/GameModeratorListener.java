@@ -2,6 +2,7 @@ package moderator.listener;
 
 import config.YmlConfig;
 import game.enums.KeyRole;
+import game.enums.Side;
 import game.enums.SpecialChannelType;
 import game.playables.Move;
 import moderator.GameSession;
@@ -88,26 +89,39 @@ public class GameModeratorListener extends ListenerAdapter {
                     if (messageTokens.length == 3 && session != null && !session.isOver() && session.getActivePlayer().getId() == author.getIdLong()) {
                         try {
                             Move move = new Move(session.getBoard(), session.getActiveSide(), messageTokens[0], messageTokens[1], messageTokens[2]);
-                             if (session.tryMove(author.getIdLong(), move)) {
-                                 sourceChannel.editMessageById(session.getSessionMessageId(), session.getBoardAsEmojis(guild)).queue(message -> {
-                                     try {
-                                         if (session.getActivePlayer().isBot()) {
-                                             TextChannel plumbingChannel = guild.getTextChannelById(DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.PLUMBING));
-                                             plumbingChannel.sendMessage(jda.getUserById(session.getActivePlayer().getId()).getAsMention() + " " + session.getBoardAsJson()).queue();
-                                         }
-                                     }
-                                     catch (Exception e) {
-                                         e.printStackTrace();
-                                         logger.error(e.getMessage());
-                                     }
-                                     eventMessage.delete().queue();
-                                 });
-//                                 sourceChannel.sendMessage(session.getBoardAsEmojis(guild)).queue();
-                             }
-                             else {
-                                 eventMessage.addReaction(EmojiUtils.CANCEL).queue();
-                                 eventMessage.delete().queueAfter(3, TimeUnit.SECONDS);
-                             }
+                            if (session.tryMove(author.getIdLong(), move)) {
+                                sourceChannel.editMessageById(session.getBoardMessageId(), session.getBoardAsEmojis(guild)).queue(message -> {
+                                    Side winningSide = session.getBoard().getVictorySide();
+                                    if (winningSide == Side.NEUTRAL) {
+                                        try {
+                                            if (session.getActivePlayer().isBot()) {
+                                                TextChannel plumbingChannel = guild.getTextChannelById(DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.PLUMBING));
+                                                plumbingChannel.sendMessage(jda.getUserById(session.getActivePlayer().getId()).getAsMention() + " " + session.getBoardAsJson()).queue();
+                                            }
+                                        } catch (Exception e) {
+                                            e.printStackTrace();
+                                            logger.error(e.getMessage());
+                                        }
+                                    }
+                                    else {
+                                        Role challengerRole = getRole(guild, KeyRole.CHALLENGER);
+                                        if (challengerRole != null) {
+                                            for (Player player : session.getPlayers()) {
+                                                guild.removeRoleFromMember(player.getId(), challengerRole).queue();
+                                            }
+                                        }
+                                        sessions.remove(guild.getIdLong());
+                                    }
+                                    sourceChannel.editMessageById(session.getStatusMessageId(), session.getStatusAsEmojis()).queue(statusMessage -> {
+                                        eventMessage.delete().queue();
+                                    });
+                                });
+    //                                sourceChannel.sendMessage(session.getBoardAsEmojis(guild)).queue();
+                            }
+                            else {
+                                eventMessage.addReaction(EmojiUtils.CANCEL).queue();
+                                eventMessage.delete().queueAfter(3, TimeUnit.SECONDS);
+                            }
                         }
                         catch (Exception e) {
                             e.printStackTrace();
@@ -234,7 +248,7 @@ public class GameModeratorListener extends ListenerAdapter {
                     handleConfirmationMessageReaction(event, playersOrCoaches,
                             (author) -> {
                                 try {
-                                    MessageReaction confirmReaction = message.getReactions().stream().filter(messageReaction -> messageReaction.getReactionEmote().isEmoji() && messageReaction.getReactionEmote().getEmoji().equals(EmojiUtils.CONFIRM)).findFirst().get();
+                                    MessageReaction confirmReaction = message.getReactions().stream().filter(messageReaction -> messageReaction.getReactionEmote().isEmoji() && messageReaction.getReactionEmote().getEmoji().equals(EmojiUtils.CONFIRM.trim())).findFirst().get();
                                     // check if both players accepted the request
                                     confirmReaction.retrieveUsers().queue((users) -> {
                                         try {
@@ -247,8 +261,11 @@ public class GameModeratorListener extends ListenerAdapter {
                                                         guild.addRoleToMember(player.getId(), challengerRole).queue();
                                                     }
                                                 }
-                                                sourceChannel.sendMessage(session.getBoardAsEmojis(guild)).queue(initialMessage -> {
-                                                    session.setSessionMessageId(initialMessage.getIdLong());
+                                                sourceChannel.sendMessage(session.getBoardAsEmojis(guild)).queue(boardMessage -> {
+                                                    session.setBoardMessageId(boardMessage.getIdLong());
+                                                    sourceChannel.sendMessage(session.getStatusAsEmojis()).queue(statusMessage -> {
+                                                        session.setStatusMessageId(statusMessage.getIdLong());
+                                                    });
                                                 });
                                                 if (session.getActivePlayer().isBot()) {
                                                     TextChannel plumbingChannel = guild.getTextChannelById(DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.PLUMBING));
@@ -285,9 +302,9 @@ public class GameModeratorListener extends ListenerAdapter {
         User user = event.getUser();
         if (event.getReactionEmote().isEmoji()) {
             String emoji = event.getReactionEmote().getEmoji();
-            if (verifiedUsers.contains(user.getIdLong()) && emoji.equals(EmojiUtils.CONFIRM)) {
+            if (verifiedUsers.contains(user.getIdLong()) && emoji.equals(EmojiUtils.CONFIRM.trim())) {
                 onConfirm.accept(user);
-            } else if (verifiedUsers.contains(user.getIdLong()) && emoji.equals(EmojiUtils.CANCEL)) {
+            } else if (verifiedUsers.contains(user.getIdLong()) && emoji.equals(EmojiUtils.CANCEL.trim())) {
                 onCancel.accept(user);
             } else {
                 message.removeReaction(emoji, user);
