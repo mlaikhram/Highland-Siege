@@ -1,7 +1,6 @@
 package moderator;
 
-import moderator.util.DBUtils;
-import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.Guild;
 
 public class Player {
 
@@ -17,8 +16,8 @@ public class Player {
         this(id, -1);
     }
 
-    public String toString(JDA jda) {
-        return jda.getUserById(id).getAsMention() + (isBot() ? String.format(" (Coach: %s)", jda.getUserById(coachId).getAsMention()) : "");
+    public String toString(Guild guild) {
+        return guild.getMemberById(id).getAsMention() + (isBot() ? String.format(" (Coach: %s)", guild.getMemberById(coachId).getAsMention()) : "");
     }
 
     public long getId() {

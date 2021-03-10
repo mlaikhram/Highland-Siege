@@ -85,9 +85,9 @@ public class EmojiUtils {
     );
 
     private static final Map<Phase, String> PHASE_EMOJIS = Map.of(
-            Phase.SETUP, "\uD83D\uDCE5 ",
-            Phase.SIEGE, "\uD83C\uDFC1 ",
-            Phase.SURVIVE, "\u2620\uFE0F "
+            Phase.SETUP, PLACE_PIECE,
+            Phase.SIEGE, ACTIVE_PIECE,
+            Phase.SURVIVE, DIED_PIECE
     );
 
     private static final Map<Side, String> WINNER_EMOJIS = Map.of(
@@ -160,7 +160,19 @@ public class EmojiUtils {
             }
             message.append("\n");
         }
-
+        message.append("`                                Capture Force: "); // TODO: add capture force in here
+        message.append(Math.abs(board.getCaptureForce()));
+        if (board.getCaptureForce() > 0) {
+            message.append(" (blue)");
+        }
+        else if (board.getCaptureForce() < 0) {
+            message.append(" (red) ");
+        }
+        else {
+            message.append("       ");
+        }
+        message.append("    Turn ");
+        message.append(String.format("%-3s`", board.getTurnCount() + ""));
         return message.toString();
     }
 
@@ -171,25 +183,7 @@ public class EmojiUtils {
              message.append(getPieceStatusString(board.getPieces(Side.FRIENDLY).get(PieceType.values()[i])));
              message.append("      ");
              message.append(getPieceStatusString(board.getPieces(Side.ENEMY).get(PieceType.values()[i])));
-             switch (i) {
-                 case 1:
-                     message.append("            Turn ");
-                     message.append(board.getTurnCount());
-                     break;
-
-                 case 2:
-                     message.append("            Capture Force: ");
-                     message.append(Math.abs(board.getCaptureForce()));
-                     if (board.getCaptureForce() > 0) {
-                         message.append(" (blue)");
-                     }
-                     else if (board.getCaptureForce() < 0) {
-                         message.append(" (red)");
-                     }
-                     break;
-
-                 default:
-             }
+             // TODO: show move history on the right
              message.append("\n");
          }
          return message.toString();
@@ -211,7 +205,10 @@ public class EmojiUtils {
             statusString = statusString + LETTER_EMOJIS[piece.getPosition().getY()] + NUMBER_EMOJIS[piece.getPosition().getX()];
             if (piece.isActive()) {
                 statusString = ACTIVE_PIECE + statusString;
-            } // TODO: check piece died this turn
+            }
+            else if (piece.getTimeToRespawn() > 0) {
+                statusString = DIED_PIECE + statusString;
+            }
             else {
                 statusString = DEAD_PIECE + statusString;
             }

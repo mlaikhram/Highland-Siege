@@ -16,12 +16,24 @@ public class Piece {
     private Side side;
     private Position position;
     private boolean isActive;
+    private int timeToRespawn;
+
+    public Piece() { }
 
     public Piece(PieceType type, Side side) {
         this.type = type;
         this.side = side;
         this.position = null;
         this.isActive = false;
+        this.timeToRespawn = 0;
+    }
+
+    public Piece(Piece piece) {
+        this.type = piece.type;
+        this.side = piece.side;
+        this.position = piece.position == null ? null : new Position(piece.position);
+        this.isActive = piece.isActive;
+        this.timeToRespawn = piece.timeToRespawn;
     }
 
     public Set<Move> getPossibleMoves(Board board) {
@@ -174,6 +186,14 @@ public class Piece {
 
     public void setActive(boolean active) {
         isActive = active;
+    }
+
+    public int getTimeToRespawn() {
+        return timeToRespawn;
+    }
+
+    public void setTimeToRespawn(int timeToRespawn) {
+        this.timeToRespawn = timeToRespawn;
     }
 
     @Override

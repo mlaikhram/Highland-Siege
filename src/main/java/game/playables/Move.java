@@ -12,14 +12,16 @@ public class Move {
     private Position newPosition;
     private Position attackPosition;
 
+    public Move() { }
+
     public Move(Board board, Side side, String pieceName, String action, String tileName) throws Exception {
         // take command like: "medic to B4" or "sniper shoot H8"
-        this.piece = board.getPieces(side).get(PieceType.valueOf(pieceName.toUpperCase()));
+        this.piece = new Piece(board.getPieces(side).get(PieceType.valueOf(pieceName.toUpperCase())));
         if (action.equalsIgnoreCase("to")) {
             this.newPosition = tileNameToPosition(tileName);
         }
         else if (action.equalsIgnoreCase("shoot")) {
-            this.newPosition = this.piece.getPosition();
+            this.newPosition = new Position(this.piece.getPosition());
             this.attackPosition = tileNameToPosition(tileName);
         }
         else {
@@ -29,9 +31,9 @@ public class Move {
     }
 
     public Move(Piece piece, Position newPosition, Position attackPosition) {
-        this.piece = piece;
-        this.newPosition = newPosition;
-        this.attackPosition = attackPosition;
+        this.piece = new Piece(piece);
+        this.newPosition = newPosition == null ? null : new Position(newPosition);
+        this.attackPosition = attackPosition == null ? null : new Position(attackPosition);
     }
 
     public Move(Piece piece, Position newPosition) {

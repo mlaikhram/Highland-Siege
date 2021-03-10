@@ -27,9 +27,29 @@ public class GameSession {
         activeSide = Side.NEUTRAL;
     }
 
-    public void begin() {
+    public void begin() throws Exception {
         board = new Board();
-        activeSide = new Random().nextBoolean() ? Side.FRIENDLY : Side.ENEMY;
+        activeSide = Side.FRIENDLY; // new Random().nextBoolean() ? Side.FRIENDLY : Side.ENEMY;
+
+        // TODO: remove after testing
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "assassin", "to", "b8"));
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "assassin", "to", "q8"));
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "beast", "to", "b4"));
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "beast", "to", "q4"));
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "medic", "to", "b5"));
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "medic", "to", "q5"));
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "paladin", "to", "b3"));
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "paladin", "to", "q3"));
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "scout", "to", "b1"));
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "scout", "to", "q1"));
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "sniper", "to", "b6"));
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "sniper", "to", "q6"));
+
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "scout", "to", "e1"));
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "scout", "to", "n1"));
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "scout", "to", "h4"));
+        this.tryMove(getActivePlayer().getId(), new Move(board, activeSide, "scout", "to", "k4"));
+
     }
 
     // TODO: convert to surrender button

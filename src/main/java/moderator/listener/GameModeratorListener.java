@@ -1,13 +1,13 @@
 package moderator.listener;
 
-import config.YmlConfig;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import config.ModeratorConfig;
 import game.enums.KeyRole;
 import game.enums.Side;
 import game.enums.SpecialChannelType;
 import game.playables.Move;
 import moderator.GameSession;
 import moderator.Player;
-import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.entities.ChannelType;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
@@ -30,27 +30,22 @@ public class GameModeratorListener extends ListenerAdapter {
 
     private static final Logger logger = LoggerFactory.getLogger(GameModeratorListener.class);
 
-    private JDA jda;
-    private YmlConfig config;
+    private ModeratorConfig config;
     private HashMap<Long, GameSession> sessions;
 
-    public GameModeratorListener(YmlConfig config) {
+    public GameModeratorListener(ModeratorConfig config) {
         this.config = config;
         this.sessions = new HashMap<>();
     }
 
-    public void setJda(JDA jda) {
-        this.jda = jda;
-    }
-
     @Override
     public void onMessageReceived(@Nonnull MessageReceivedEvent event) {
-        if (event.getAuthor().getIdLong() == jda.getSelfUser().getIdLong()) {
-            return;
-        }
-
         Guild guild = event.getGuild();
         MessageChannel sourceChannel = event.getChannel();
+//        if (event.getAuthor().getIdLong() == guild.getSelfMember().getIdLong() && ) {
+//            return;
+//        }
+
         Message eventMessage = event.getMessage();
         User author = event.getAuthor();
 
@@ -63,7 +58,7 @@ public class GameModeratorListener extends ListenerAdapter {
                 if (!author.isBot() && sourceChannel.getIdLong() == DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.REGISTRATION) && messageTokens.length >= 2 && messageTokens[0].equalsIgnoreCase("register") && MessageUtils.isUserMention(messageTokens[1])) {
                     try {
                         long botId = MessageUtils.mentionToUserID(messageTokens[1]);
-                        User botUser = jda.getUserById(botId);
+                        User botUser = guild.getMemberById(botId).getUser();
                         if (botUser.isBot()) {// && botId != jda.getSelfUser().getIdLong()) { // TODO: uncomment self check after testing
                             long coachId = DBUtils.getBotCoach(botId);
                             if (coachId == -1) {
@@ -74,7 +69,7 @@ public class GameModeratorListener extends ListenerAdapter {
                                     message.addReaction(EmojiUtils.CANCEL).queue();
                                 }));
                             } else {
-                                throw new Exception("This bot is already registered by " + jda.getUserById(coachId).getAsMention());
+                                throw new Exception("This bot is already registered by " + guild.getMemberById(coachId).getAsMention());
                             }
                         } else {
                             throw new Exception("You can only register bots that you make!");
@@ -83,45 +78,13 @@ public class GameModeratorListener extends ListenerAdapter {
                         sourceChannel.sendMessage(e.getMessage()).queue();
                     }
                 }
-                // TODO: make move from #arena
-                else if (sourceChannel.getIdLong() == DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.ARENA)) {
+                // make move from #arena
+                else if (author.getIdLong() != guild.getSelfMember().getIdLong() && sourceChannel.getIdLong() == DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.ARENA)) {
                     GameSession session = sessions.get(guild.getIdLong());
                     if (messageTokens.length == 3 && session != null && !session.isOver() && session.getActivePlayer().getId() == author.getIdLong()) {
                         try {
                             Move move = new Move(session.getBoard(), session.getActiveSide(), messageTokens[0], messageTokens[1], messageTokens[2]);
-                            if (session.tryMove(author.getIdLong(), move)) {
-                                sourceChannel.editMessageById(session.getBoardMessageId(), session.getBoardAsEmojis(guild)).queue(message -> {
-                                    Side winningSide = session.getBoard().getVictorySide();
-                                    if (winningSide == Side.NEUTRAL) {
-                                        try {
-                                            if (session.getActivePlayer().isBot()) {
-                                                TextChannel plumbingChannel = guild.getTextChannelById(DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.PLUMBING));
-                                                plumbingChannel.sendMessage(jda.getUserById(session.getActivePlayer().getId()).getAsMention() + " " + session.getBoardAsJson()).queue();
-                                            }
-                                        } catch (Exception e) {
-                                            e.printStackTrace();
-                                            logger.error(e.getMessage());
-                                        }
-                                    }
-                                    else {
-                                        Role challengerRole = getRole(guild, KeyRole.CHALLENGER);
-                                        if (challengerRole != null) {
-                                            for (Player player : session.getPlayers()) {
-                                                guild.removeRoleFromMember(player.getId(), challengerRole).queue();
-                                            }
-                                        }
-                                        sessions.remove(guild.getIdLong());
-                                    }
-                                    sourceChannel.editMessageById(session.getStatusMessageId(), session.getStatusAsEmojis()).queue(statusMessage -> {
-                                        eventMessage.delete().queue();
-                                    });
-                                });
-    //                                sourceChannel.sendMessage(session.getBoardAsEmojis(guild)).queue();
-                            }
-                            else {
-                                eventMessage.addReaction(EmojiUtils.CANCEL).queue();
-                                eventMessage.delete().queueAfter(3, TimeUnit.SECONDS);
-                            }
+                            handleSendBoardMessages(session, author, move, sourceChannel, guild, eventMessage, true);
                         }
                         catch (Exception e) {
                             e.printStackTrace();
@@ -136,11 +99,28 @@ public class GameModeratorListener extends ListenerAdapter {
                     }
                 }
                 // TODO: make move from #plumbing
-                else if (sourceChannel.getIdLong() == DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.PLUMBING)) {
-                    eventMessage.delete().queue();
+                else if (messageTokens.length >= 1 && !MessageUtils.isUserMention(messageTokens[0]) && sourceChannel.getIdLong() == DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.PLUMBING) && author.isBot()) {
+                    GameSession session = sessions.get(guild.getIdLong());
+                    if (session != null && !session.isOver() && session.getActivePlayer().getId() == author.getIdLong()) {
+                        try {
+                            Move move = new ObjectMapper().readValue(rawMessage, Move.class);
+                            if (session.getActiveSide() == Side.ENEMY) {
+                                move = move.getRotated(session.getBoard());
+                            }
+                            MessageChannel arenaChannel = guild.getTextChannelById(DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.ARENA));
+                            handleSendBoardMessages(session, author, move, arenaChannel, guild, eventMessage, false);
+                        }
+                        catch (Exception e) {
+                            e.printStackTrace();
+                            logger.info("invalid move: " + e.getMessage());
+                            eventMessage.addReaction(EmojiUtils.CANCEL).queue();
+//                            eventMessage.delete().queueAfter(3, TimeUnit.SECONDS);
+                        }
+                    }
+//                    eventMessage.delete().queue();
                 }
                 // Set Special Channels (@this set arena|plumbing|registration)
-                else if (!author.isBot() && event.getAuthor().getIdLong() == config.getAdmin() && messageTokens.length >= 3 && MessageUtils.isUserMention(messageTokens[0]) && MessageUtils.mentionToUserID(messageTokens[0]) == jda.getSelfUser().getIdLong() && messageTokens[1].equalsIgnoreCase("set")) {
+                else if (!author.isBot() && event.getAuthor().getIdLong() == config.getAdmin() && messageTokens.length >= 3 && MessageUtils.isUserMention(messageTokens[0]) && MessageUtils.mentionToUserID(messageTokens[0]) == guild.getSelfMember().getIdLong() && messageTokens[1].equalsIgnoreCase("set")) {
                     try {
                         SpecialChannelType channelType = SpecialChannelType.valueOf(messageTokens[2].toUpperCase());
                         DBUtils.setSpecialChannel(guild.getIdLong(), channelType, sourceChannel.getIdLong());
@@ -152,14 +132,14 @@ public class GameModeratorListener extends ListenerAdapter {
                 // user challenge anyone from any channel
                 else if (!author.isBot() && messageTokens.length >= 2 && messageTokens[0].equalsIgnoreCase("challenge") && MessageUtils.isUserMention(messageTokens[1])) {
                     if (!sessions.containsKey(guild.getIdLong()) || sessions.get(guild.getIdLong()).isOver()) {
-                        User defender = jda.getUserById(MessageUtils.mentionToUserID(messageTokens[1]));
+                        User defender = guild.getMemberById(MessageUtils.mentionToUserID(messageTokens[1])).getUser();
                         if (!defender.isBot() || DBUtils.isBotVerified(defender.getIdLong())) {
                             Player challengerPlayer = new Player(author.getIdLong());
                             Player defenderPlayer = new Player(defender.getIdLong(), DBUtils.getBotCoach(defender.getIdLong()));
 
                             sessions.put(guild.getIdLong(), new GameSession(challengerPlayer, defenderPlayer));
                             TextChannel arenaChannel = guild.getTextChannelById(DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.ARENA));
-                            arenaChannel.sendMessage(challengerPlayer.toString(jda) + " has challenged " + defenderPlayer.toString(jda) + " to a game! " + MessageUtils.ARENA_REQUEST_MESSAGE).queue(message -> {
+                            arenaChannel.sendMessage(challengerPlayer.toString(guild) + " has challenged " + defenderPlayer.toString(guild) + " to a game! " + MessageUtils.ARENA_REQUEST_MESSAGE).queue(message -> {
                                 message.addReaction(EmojiUtils.CONFIRM).queue();
                                 message.addReaction(EmojiUtils.CANCEL).queue();
                             });
@@ -181,6 +161,54 @@ public class GameModeratorListener extends ListenerAdapter {
         }
     }
 
+    private void handleSendBoardMessages(GameSession session, User author, Move move, MessageChannel sourceChannel, Guild guild, Message eventMessage, boolean deleteSent) throws Exception {
+        if (session.tryMove(author.getIdLong(), move)) {
+            updateBoardMessage(session, sourceChannel, guild, eventMessage, deleteSent);
+            //                                sourceChannel.sendMessage(session.getBoardAsEmojis(guild)).queue();
+        }
+        else {
+            eventMessage.addReaction(EmojiUtils.CANCEL).queue();
+            if (deleteSent) {
+                eventMessage.delete().queueAfter(3, TimeUnit.SECONDS);
+            }
+        }
+    }
+
+    private void updateBoardMessage(GameSession session, MessageChannel sourceChannel, Guild guild, Message eventMessage, boolean deleteSent) {
+        sourceChannel.editMessageById(session.getBoardMessageId(), session.getBoardAsEmojis(guild)).queue(message -> {
+            Side winningSide = session.getBoard().getVictorySide();
+            if (winningSide == Side.NEUTRAL) {
+                try {
+                    if (session.getActivePlayer().isBot()) {
+                        TextChannel plumbingChannel = guild.getTextChannelById(DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.PLUMBING));
+                        plumbingChannel.sendMessage(guild.getMemberById(session.getActivePlayer().getId()).getAsMention() + " " + session.getBoardAsJson()).queue();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    logger.error(e.getMessage());
+                }
+            }
+            else {
+                Role challengerRole = getRole(guild, KeyRole.CHALLENGER);
+                if (challengerRole != null) {
+                    for (Player player : session.getPlayers()) {
+                        guild.removeRoleFromMember(player.getId(), challengerRole).queue();
+                    }
+                }
+                sessions.remove(guild.getIdLong());
+            }
+            sourceChannel.editMessageById(session.getStatusMessageId(), session.getStatusAsEmojis()).queue(statusMessage -> {
+                if (deleteSent) {
+                    eventMessage.delete().queue();
+                }
+            });
+        }, (error) -> {
+            logger.error(error.getMessage());
+            error.printStackTrace();
+            sourceChannel.sendMessage(error.getMessage()).queue();
+        });
+    }
+
     @Override
     public void onMessageReactionAdd(@Nonnull MessageReactionAddEvent event) {
         Guild guild = event.getGuild();
@@ -189,7 +217,7 @@ public class GameModeratorListener extends ListenerAdapter {
         User user = event.getUser();
 
         try {
-            if (event.isFromType(ChannelType.TEXT) && message.getAuthor().getIdLong() == jda.getSelfUser().getIdLong() && user != null) {
+            if (event.isFromType(ChannelType.TEXT) && message.getAuthor().getIdLong() == guild.getSelfMember().getIdLong() && user != null) {
 
                 // check for bot registration requests
                 if (sourceChannel.getIdLong() == DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.REGISTRATION)) {
@@ -205,8 +233,8 @@ public class GameModeratorListener extends ListenerAdapter {
                                         message.delete().queue();
 
                                         // PM bot owner
-                                        jda.getUserById(coachId).openPrivateChannel().queue((privateChannel -> {
-                                            privateChannel.sendMessage("Your bot " + jda.getUserById(botId).getAsTag() + " was verified! You may now play Highland Siege with this bot!").queue();
+                                        guild.getMemberById(coachId).getUser().openPrivateChannel().queue((privateChannel -> {
+                                            privateChannel.sendMessage("Your bot " + guild.getMemberById(botId).getUser().getAsTag() + " was verified! You may now play Highland Siege with this bot!").queue();
                                         }));
 
                                         // assign roles
@@ -230,8 +258,8 @@ public class GameModeratorListener extends ListenerAdapter {
                                         message.delete().queue();
 
                                         // PM bot owner
-                                        jda.getUserById(coachId).openPrivateChannel().queue((privateChannel -> {
-                                            privateChannel.sendMessage("Unfortunately, your registration for bot " + jda.getUserById(botId).getAsTag() + " was cancelled. Please contact an admin if you need further assistance.").queue();
+                                        guild.getMemberById(coachId).getUser().openPrivateChannel().queue((privateChannel -> {
+                                            privateChannel.sendMessage("Unfortunately, your registration for bot " + guild.getMemberById(botId).getUser().getAsTag() + " was cancelled. Please contact an admin if you need further assistance.").queue();
                                         }));
                                     } catch (Exception e) {
                                         handleError(e, sourceChannel);
@@ -269,7 +297,7 @@ public class GameModeratorListener extends ListenerAdapter {
                                                 });
                                                 if (session.getActivePlayer().isBot()) {
                                                     TextChannel plumbingChannel = guild.getTextChannelById(DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.PLUMBING));
-                                                    plumbingChannel.sendMessage(jda.getUserById(session.getActivePlayer().getId()).getAsMention() + " " + session.getBoardAsJson()).queue();
+                                                    plumbingChannel.sendMessage(guild.getMemberById(session.getActivePlayer().getId()).getAsMention() + " " + session.getBoardAsJson()).queue();
                                                 }
                                                 message.delete().queue();
 

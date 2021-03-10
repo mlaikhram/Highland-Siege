@@ -1,5 +1,6 @@
 package game.playables;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import game.enums.Phase;
@@ -54,6 +55,7 @@ public class Board {
     );
 
     private final int CAPTURE_THRESHOLD = 15;
+    private final int RESPAWN_DELAY = 1;
 
     private HashMap<PieceType, Piece> friendlyPieces;
     private HashMap<PieceType, Piece> enemyPieces;
@@ -71,6 +73,19 @@ public class Board {
         this.turnCount = 0;
     }
 
+    public Board(Board board) {
+        this.friendlyPieces = new HashMap<>();
+        this.enemyPieces = new HashMap<>();
+        for (PieceType pieceType : PieceType.values()) {
+            this.friendlyPieces.put(pieceType, new Piece(board.friendlyPieces.get(pieceType)));
+            this.enemyPieces.put(pieceType, new Piece(board.enemyPieces.get(pieceType)));
+        }
+        this.capturePoints = new LinkedList<>(board.capturePoints);
+        this.captureForce = board.captureForce;
+        this.phase = board.phase;
+        this.turnCount = board.turnCount;
+    }
+
     public Board rotated() {
         // rotate pieces on board [P(x,y) --> P'(-x+2x_O,-y+2y_O)] -3,-1 -> 1,-1 about -1,-1
         // flip Enemy <-> Friendly
@@ -81,21 +96,28 @@ public class Board {
         for (PieceType pieceType : PieceType.values()) {
             rotatedBoard.friendlyPieces.get(pieceType).setActive(enemyPieces.get(pieceType).isActive());
             rotatedBoard.friendlyPieces.get(pieceType).setPosition(enemyPieces.get(pieceType).getPosition() == null ? null : enemyPieces.get(pieceType).getPosition().rotated());
+            rotatedBoard.friendlyPieces.get(pieceType).setTimeToRespawn(enemyPieces.get(pieceType).getTimeToRespawn());
 
             rotatedBoard.enemyPieces.get(pieceType).setActive(friendlyPieces.get(pieceType).isActive());
             rotatedBoard.enemyPieces.get(pieceType).setPosition(friendlyPieces.get(pieceType).getPosition() == null ? null : friendlyPieces.get(pieceType).getPosition().rotated());
+            rotatedBoard.enemyPieces.get(pieceType).setTimeToRespawn(friendlyPieces.get(pieceType).getTimeToRespawn());
+
         }
         rotatedBoard.captureForce = -captureForce;
-//        for (int i = 0; i < capturePoints.size(); ++i) {
-//            rotatedBoard.capturePoints.set(i, capturePoints.get(capturePoints.size() - 1 - i));
-//        }
+        for (int i = 0; i < capturePoints.size(); ++i) {
+            rotatedBoard.capturePoints.set(i, capturePoints.get(capturePoints.size() - 1 - i).reverse());
+        }
         return rotatedBoard;
     }
 
+    @JsonIgnore
     public Set<Move> getPossibleMoves(Side side) {
         if (side == side.ENEMY) {
-            Board rotatedBoard = rotated();
+            Board rotatedBoard = rotated(); // TODO: this could maybe be optimized to avoid a double rotation
             return rotatedBoard.getPossibleMoves(side.FRIENDLY).stream().map(move ->  move.getRotated(this)).collect(Collectors.toSet());
+        }
+        else if (getVictorySide() != Side.NEUTRAL) {
+            return new HashSet<>();
         }
         else if (side == side.FRIENDLY) {
             Set<Move> moves = new HashSet<>();
@@ -117,11 +139,10 @@ public class Board {
             }
             else if (phase != Phase.END) {
                 for (Piece piece: friendlyPieces.values()) {
-                    if (!piece.isActive()) {
+                    if (!piece.isActive() && piece.getTimeToRespawn() <= 0) {
                         // allow respawn if in siege phase
                         if (phase == Phase.SIEGE) {
                             int spawnCapturePointIndex = getBasePoint();
-                            logger.info("capture point: " + spawnCapturePointIndex);
                             if (spawnCapturePointIndex >= 0) {
                                 for (Position position : CAPTURE_POINT_POSITIONS.get(spawnCapturePointIndex)) {
                                     if (isValidSpawnPosition(position)) {
@@ -142,7 +163,7 @@ public class Board {
                             }
                         }
                     }
-                    else {
+                    else if (piece.isActive()) {
                         moves.addAll(piece.getPossibleMoves(this));
                     }
                 }
@@ -155,18 +176,21 @@ public class Board {
     }
 
     public void applyMove(Move move) {
-        move.getPiece().setActive(true);
-        if (!move.getNewPosition().equals(move.getPiece().getPosition())) {
+        Piece boardPiece = getPieces(move.getPiece().getSide()).get(move.getPiece().getType());
+        if (!boardPiece.isActive() || !move.getNewPosition().equals(boardPiece.getPosition())) {
             Piece collision = getActivePieceAt(move.getNewPosition().getX(), move.getNewPosition().getY());
             if (collision != null) {
                 collision.setActive(false);
+                collision.setTimeToRespawn(RESPAWN_DELAY + 1);
             }
-            move.getPiece().setPosition(move.getNewPosition());
+            boardPiece.setPosition(move.getNewPosition());
         }
+        boardPiece.setActive(true);
         if (move.getAttackPosition() != null) {
             Piece victim = getActivePieceAt(move.getAttackPosition().getX(), move.getAttackPosition().getY());
             if (victim != null) {
                 victim.setActive(false);
+                victim.setTimeToRespawn(RESPAWN_DELAY + 1);
             }
         }
         if (phase == Phase.SETUP && !Stream.concat(friendlyPieces.values().stream(), enemyPieces.values().stream()).anyMatch((piece) -> piece.getPosition() == null)) {
@@ -175,16 +199,17 @@ public class Board {
         if (phase != Phase.SETUP) {
             updateCaptureForce();
             Side winner = getVictorySide();
-            logger.info("victory side: " + winner);
             if (winner != Side.NEUTRAL) {
                 phase = Phase.END;
             }
             else {
                 ++turnCount;
+                Stream.concat(friendlyPieces.values().stream(), enemyPieces.values().stream()).filter(piece -> !piece.isActive() && piece.getTimeToRespawn() > 0).forEach(piece -> piece.setTimeToRespawn(piece.getTimeToRespawn() - 1));
             }
         }
     }
 
+    @JsonIgnore
     public Side getVictorySide() {
         if (!capturePoints.contains(Side.FRIENDLY) && (capturePoints.get(0) == Side.ENEMY || !friendlyPieces.values().stream().anyMatch(piece -> piece.isActive()))) {
             return Side.ENEMY;
@@ -232,10 +257,12 @@ public class Board {
         }
     }
 
+    @JsonIgnore
     public Piece getActivePieceAt(int x, int y) {
         return Stream.concat(friendlyPieces.values().stream(), enemyPieces.values().stream()).filter((piece) -> piece.getPosition() != null && piece.isActive() && piece.getPosition().getX() == x && piece.getPosition().getY() == y).findFirst().orElse(null);
     }
 
+    @JsonIgnore
     public Map<PieceType, Piece> getPieces(Side side) {
         switch (side) {
             case FRIENDLY:
@@ -273,7 +300,7 @@ public class Board {
     }
 
     // all below for friendly
-
+    @JsonIgnore
     private int getBasePoint() {
         for (int i = capturePoints.size() - 1; i >= 0; --i) {
             if (capturePoints.get(i) == Side.FRIENDLY) {
