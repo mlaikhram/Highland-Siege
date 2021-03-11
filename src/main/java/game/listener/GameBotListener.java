@@ -17,6 +17,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 
 public abstract class GameBotListener extends ListenerAdapter {
@@ -47,8 +49,8 @@ public abstract class GameBotListener extends ListenerAdapter {
             String[] messageTokens = rawMessage.split("[ ]+");
 
             // respond to board json with best move json
-            if (messageTokens.length >= 2 && MessageUtils.isUserMention(messageTokens[0]) && MessageUtils.mentionToUserID(messageTokens[0]) == guild.getSelfMember().getIdLong()) {
-                Board board = mapper.readValue(messageTokens[1], Board.class);
+            if (messageTokens.length >= 3 && messageTokens[1].equalsIgnoreCase("play") && MessageUtils.isUserMention(messageTokens[0]) && MessageUtils.mentionToUserID(messageTokens[0]) == guild.getSelfMember().getIdLong()) {
+                Board board = mapper.readValue(messageTokens[2], Board.class);
                 Move bestMove = determineBestMove(board);
                 if (bestMove != null) {
                     logger.info("sending move");
@@ -77,7 +79,7 @@ public abstract class GameBotListener extends ListenerAdapter {
     private Move determineBestMove(Board board) throws Exception { // TODO: determine win/lose states
         timeout = false;
         start = System.currentTimeMillis();
-        Set<Move> possibleMoves = board.getPossibleMoves(Side.FRIENDLY);
+        List<Move> possibleMoves = board.getPossibleMoves(Side.FRIENDLY);
         Iterator<Move> moveIterator = possibleMoves.iterator();
         if (moveIterator.hasNext()) {
             bestMove = moveIterator.next();
@@ -116,7 +118,7 @@ public abstract class GameBotListener extends ListenerAdapter {
         {
             return determineBoardValue(board);
         }
-        Set<Move> legalMoves = board.getPossibleMoves(Side.FRIENDLY);
+        List<Move> legalMoves = board.getPossibleMoves(Side.FRIENDLY);
 
         for (Move move : legalMoves)
         {
@@ -147,7 +149,7 @@ public abstract class GameBotListener extends ListenerAdapter {
         {
             return determineBoardValue(board);
         }
-        Set<Move> legalMoves = board.getPossibleMoves(Side.ENEMY);
+        List<Move> legalMoves = board.getPossibleMoves(Side.ENEMY);
 
         for (Move move : legalMoves)
         {

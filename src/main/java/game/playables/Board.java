@@ -54,8 +54,9 @@ public class Board {
             )
     );
 
-    private final int CAPTURE_THRESHOLD = 15;
-    private final int RESPAWN_DELAY = 1;
+    private static final int CAPTURE_THRESHOLD = 15;
+    private static final int STANDBY_TURN_COUNT = 5;
+    private static final int RESPAWN_DELAY = 9;
 
     private HashMap<PieceType, Piece> friendlyPieces;
     private HashMap<PieceType, Piece> enemyPieces;
@@ -63,6 +64,7 @@ public class Board {
     private int captureForce;
     private Phase phase;
     private int turnCount;
+    private int standbyTurnCount;
 
     public Board() {
         this.friendlyPieces = initializePieces(Side.FRIENDLY);
@@ -71,6 +73,7 @@ public class Board {
         this.captureForce = 0;
         this.phase = Phase.SETUP;
         this.turnCount = 0;
+        this.standbyTurnCount = 0;
     }
 
     public Board(Board board) {
@@ -84,6 +87,7 @@ public class Board {
         this.captureForce = board.captureForce;
         this.phase = board.phase;
         this.turnCount = board.turnCount;
+        this.standbyTurnCount = board.standbyTurnCount;
     }
 
     public Board rotated() {
@@ -93,6 +97,7 @@ public class Board {
         Board rotatedBoard = new Board();
         rotatedBoard.phase = phase;
         rotatedBoard.turnCount = turnCount;
+        rotatedBoard.standbyTurnCount = standbyTurnCount;
         for (PieceType pieceType : PieceType.values()) {
             rotatedBoard.friendlyPieces.get(pieceType).setActive(enemyPieces.get(pieceType).isActive());
             rotatedBoard.friendlyPieces.get(pieceType).setPosition(enemyPieces.get(pieceType).getPosition() == null ? null : enemyPieces.get(pieceType).getPosition().rotated());
@@ -111,13 +116,13 @@ public class Board {
     }
 
     @JsonIgnore
-    public Set<Move> getPossibleMoves(Side side) {
+    public List<Move> getPossibleMoves(Side side) {
         if (side == side.ENEMY) {
             Board rotatedBoard = rotated(); // TODO: this could maybe be optimized to avoid a double rotation
-            return rotatedBoard.getPossibleMoves(side.FRIENDLY).stream().map(move ->  move.getRotated(this)).collect(Collectors.toSet());
+            return rotatedBoard.getPossibleMoves(side.FRIENDLY).stream().map(move ->  move.getRotated(this)).collect(Collectors.toList());
         }
         else if (getVictorySide() != Side.NEUTRAL) {
-            return new HashSet<>();
+            return new LinkedList<>();
         }
         else if (side == side.FRIENDLY) {
             Set<Move> moves = new HashSet<>();
@@ -141,7 +146,7 @@ public class Board {
                 for (Piece piece: friendlyPieces.values()) {
                     if (!piece.isActive() && piece.getTimeToRespawn() <= 0) {
                         // allow respawn if in siege phase
-                        if (phase == Phase.SIEGE) {
+                        if (phase == Phase.SIEGE || phase == Phase.STANDBY) {
                             int spawnCapturePointIndex = getBasePoint();
                             if (spawnCapturePointIndex >= 0) {
                                 for (Position position : CAPTURE_POINT_POSITIONS.get(spawnCapturePointIndex)) {
@@ -168,10 +173,12 @@ public class Board {
                     }
                 }
             }
-            return moves; // TODO: shuffle moves for variance?
+            List<Move> movesList = new LinkedList<>(moves);
+            Collections.shuffle(movesList);
+            return movesList;
         }
         else {
-            return new HashSet<>();
+            return new LinkedList<>();
         }
     }
 
@@ -197,7 +204,15 @@ public class Board {
             phase = Phase.SIEGE;
         }
         if (phase != Phase.SETUP) {
-            updateCaptureForce();
+            if (phase == Phase.STANDBY) {
+                --standbyTurnCount;
+                if (standbyTurnCount <= 0) {
+                    phase = Phase.SIEGE;
+                }
+            }
+            else {
+                updateCaptureForce();
+            }
             Side winner = getVictorySide();
             if (winner != Side.NEUTRAL) {
                 phase = Phase.END;
@@ -239,6 +254,8 @@ public class Board {
             captureForce += (captureForce >= 0 ? 1 : 2) * friendlyCount;
             if (captureForce >= CAPTURE_THRESHOLD) {
                 capturePoints.set(activeCapturePoint, Side.FRIENDLY);
+                phase = Phase.STANDBY;
+                standbyTurnCount = STANDBY_TURN_COUNT;
                 if (activeCapturePoint < capturePoints.size() - 1) {
                     capturePoints.set(activeCapturePoint + 1, Side.NEUTRAL);
                     captureForce = 0;
@@ -249,11 +266,23 @@ public class Board {
             captureForce -= (captureForce <= 0 ? 1 : 2) * enemyCount;
             if (-captureForce >= CAPTURE_THRESHOLD) {
                 capturePoints.set(activeCapturePoint, Side.ENEMY);
+                phase = Phase.STANDBY;
+                standbyTurnCount = STANDBY_TURN_COUNT;
                 if (activeCapturePoint > 0) {
                     capturePoints.set(activeCapturePoint - 1, Side.NEUTRAL);
                     captureForce = 0;
                 }
             }
+        }
+    }
+
+    @JsonIgnore
+    public List<Position> getActiveCapturePoint() {
+        if (capturePoints.contains(Side.NEUTRAL)) {
+            return CAPTURE_POINT_POSITIONS.get(capturePoints.indexOf(Side.NEUTRAL));
+        }
+        else {
+            return new LinkedList<>();
         }
     }
 
@@ -368,5 +397,13 @@ public class Board {
 
     public void setTurnCount(int turnCount) {
         this.turnCount = turnCount;
+    }
+
+    public int getStandbyTurnCount() {
+        return standbyTurnCount;
+    }
+
+    public void setStandbyTurnCount(int standbyTurnCount) {
+        this.standbyTurnCount = standbyTurnCount;
     }
 }

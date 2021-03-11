@@ -98,7 +98,7 @@ public class GameModeratorListener extends ListenerAdapter {
                         eventMessage.delete().queueAfter(3, TimeUnit.SECONDS);
                     }
                 }
-                // TODO: make move from #plumbing
+                // make move from #plumbing
                 else if (messageTokens.length >= 1 && !MessageUtils.isUserMention(messageTokens[0]) && sourceChannel.getIdLong() == DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.PLUMBING) && author.isBot()) {
                     GameSession session = sessions.get(guild.getIdLong());
                     if (session != null && !session.isOver() && session.getActivePlayer().getId() == author.getIdLong()) {
@@ -153,6 +153,33 @@ public class GameModeratorListener extends ListenerAdapter {
                     }
                 }
                 // TODO: bot challenge anyone from any channel
+                else if (!author.isBot() && messageTokens.length >= 3 && messageTokens[1].equalsIgnoreCase("challenge") && MessageUtils.isUserMention(messageTokens[0]) && MessageUtils.isUserMention(messageTokens[2])) {
+                    if (!sessions.containsKey(guild.getIdLong()) || sessions.get(guild.getIdLong()).isOver()) {
+                        User challenger = guild.getMemberById(MessageUtils.mentionToUserID(messageTokens[0])).getUser();
+                        if (DBUtils.getBotCoach(challenger.getIdLong()) == author.getIdLong()) {
+                            User defender = guild.getMemberById(MessageUtils.mentionToUserID(messageTokens[2])).getUser();
+                            if (!defender.isBot() || DBUtils.isBotVerified(defender.getIdLong())) {
+                                Player challengerPlayer = new Player(challenger.getIdLong(), author.getIdLong());
+                                Player defenderPlayer = new Player(defender.getIdLong(), DBUtils.getBotCoach(defender.getIdLong()));
+
+                                sessions.put(guild.getIdLong(), new GameSession(challengerPlayer, defenderPlayer));
+                                TextChannel arenaChannel = guild.getTextChannelById(DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.ARENA));
+                                arenaChannel.sendMessage(challengerPlayer.toString(guild) + " has challenged " + defenderPlayer.toString(guild) + " to a game! " + MessageUtils.ARENA_REQUEST_MESSAGE).queue(message -> {
+                                    message.addReaction(EmojiUtils.CONFIRM).queue();
+                                    message.addReaction(EmojiUtils.CANCEL).queue();
+                                });
+                            } else {
+                                sourceChannel.sendMessage("You can only challenge other players or verified bots!").queue();
+                            }
+                        }
+                        else {
+                            sourceChannel.sendMessage("You can only start a challenge on behalf of yourself or one of your bots!").queue();
+                        }
+                    }
+                    else {
+                        sourceChannel.sendMessage("There's already a game pending or in session!").queue();
+                    }
+                }
                 // TODO: help text
             }
         }
@@ -181,7 +208,7 @@ public class GameModeratorListener extends ListenerAdapter {
                 try {
                     if (session.getActivePlayer().isBot()) {
                         TextChannel plumbingChannel = guild.getTextChannelById(DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.PLUMBING));
-                        plumbingChannel.sendMessage(guild.getMemberById(session.getActivePlayer().getId()).getAsMention() + " " + session.getBoardAsJson()).queue();
+                        plumbingChannel.sendMessage(guild.getMemberById(session.getActivePlayer().getId()).getAsMention() + " play " + session.getBoardAsJson()).queue();
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -297,7 +324,7 @@ public class GameModeratorListener extends ListenerAdapter {
                                                 });
                                                 if (session.getActivePlayer().isBot()) {
                                                     TextChannel plumbingChannel = guild.getTextChannelById(DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.PLUMBING));
-                                                    plumbingChannel.sendMessage(guild.getMemberById(session.getActivePlayer().getId()).getAsMention() + " " + session.getBoardAsJson()).queue();
+                                                    plumbingChannel.sendMessage(guild.getMemberById(session.getActivePlayer().getId()).getAsMention() + " play " + session.getBoardAsJson()).queue();
                                                 }
                                                 message.delete().queue();
 

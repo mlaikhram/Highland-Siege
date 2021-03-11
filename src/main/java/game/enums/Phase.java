@@ -4,5 +4,6 @@ public enum Phase {
     SETUP,
     SIEGE,
     SURVIVE,
+    STANDBY,
     END
 }

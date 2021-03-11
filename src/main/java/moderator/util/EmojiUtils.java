@@ -87,7 +87,8 @@ public class EmojiUtils {
     private static final Map<Phase, String> PHASE_EMOJIS = Map.of(
             Phase.SETUP, PLACE_PIECE,
             Phase.SIEGE, ACTIVE_PIECE,
-            Phase.SURVIVE, DIED_PIECE
+            Phase.SURVIVE, DIED_PIECE,
+            Phase.STANDBY, "\uD83C\uDFF3\uFE0F "
     );
 
     private static final Map<Side, String> WINNER_EMOJIS = Map.of(
@@ -151,7 +152,6 @@ public class EmojiUtils {
         message.append("   `\n");
         message.append(getCornerEmoji(board));
         message.append(String.join("", LETTER_EMOJIS));
-//        message.append(" \uD83C\uDDE6 \uD83C\uDDE7 \uD83C\uDDE8 \uD83C\uDDE9 \uD83C\uDDEA \uD83C\uDDEB \uD83C\uDDEC \uD83C\uDDED \uD83C\uDDEE \uD83C\uDDEF \uD83C\uDDF0 \uD83C\uDDF1 \uD83C\uDDF2 \uD83C\uDDF3 \uD83C\uDDF4 \uD83C\uDDF5 \uD83C\uDDF6 \uD83C\uDDF7 ");
         message.append(getCornerEmoji(board));
         message.append("\n");
         for (int x = 0; x < boardArr.length; ++x) {
@@ -160,16 +160,20 @@ public class EmojiUtils {
             }
             message.append("\n");
         }
-        message.append("`                                Capture Force: "); // TODO: add capture force in here
-        message.append(Math.abs(board.getCaptureForce()));
-        if (board.getCaptureForce() > 0) {
-            message.append(" (blue)");
-        }
-        else if (board.getCaptureForce() < 0) {
-            message.append(" (red) ");
+        if (board.getPhase() == Phase.STANDBY) {
+            message.append("`                                Capture Standby: ");
+            message.append(String.format("%-6s", board.getStandbyTurnCount()));
         }
         else {
-            message.append("       ");
+            message.append("`                                Capture Force: ");
+            message.append(Math.abs(board.getCaptureForce()));
+            if (board.getCaptureForce() > 0) {
+                message.append(" (blue)");
+            } else if (board.getCaptureForce() < 0) {
+                message.append(" (red) ");
+            } else {
+                message.append("       ");
+            }
         }
         message.append("    Turn ");
         message.append(String.format("%-3s`", board.getTurnCount() + ""));
@@ -180,8 +184,10 @@ public class EmojiUtils {
          StringBuilder message = new StringBuilder();
          message.append("\n");
          for (int i = 0; i < PieceType.values().length; ++i) {
+             message.append(String.format("`%2s`", board.getPieces(Side.FRIENDLY).get(PieceType.values()[i]).getTimeToRespawn() > 0 ? board.getPieces(Side.FRIENDLY).get(PieceType.values()[i]).getTimeToRespawn() : "  "));
              message.append(getPieceStatusString(board.getPieces(Side.FRIENDLY).get(PieceType.values()[i])));
              message.append("      ");
+             message.append(String.format("`%2s`", board.getPieces(Side.ENEMY).get(PieceType.values()[i]).getTimeToRespawn() > 0 ? board.getPieces(Side.ENEMY).get(PieceType.values()[i]).getTimeToRespawn() : "  "));
              message.append(getPieceStatusString(board.getPieces(Side.ENEMY).get(PieceType.values()[i])));
              // TODO: show move history on the right
              message.append("\n");
