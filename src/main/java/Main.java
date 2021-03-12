@@ -7,6 +7,8 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Activity;
 import moderator.util.DBUtils;
+import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.utils.MemberCachePolicy;
 
 import java.io.File;
 
@@ -18,6 +20,8 @@ public class Main {
         DBUtils.init(config.getDbPath());
         GameModeratorListener gameModeratorListener = new GameModeratorListener(config);
         JDA jda = JDABuilder.createDefault(config.getToken())
+                .setMemberCachePolicy(MemberCachePolicy.ALL)
+                .enableIntents(GatewayIntent.GUILD_MEMBERS)
                 .addEventListeners(gameModeratorListener)
                 .addEventListeners(new SampleBotListener(config))
                 .setActivity(Activity.playing("Highland Siege"))

@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'maven-publish'
 }
 
 group 'matt.bot.discord'
@@ -18,7 +19,6 @@ dependencies {
     compile group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.30'
     compile group: 'org.xerial', name: 'sqlite-jdbc', version: '3.34.0'
 
-
     testCompile group: 'junit', name: 'junit', version: '4.12'
 }
 
@@ -28,8 +28,31 @@ jar {
                 "Main-Class": "Main"
         )
     }
-
     from {
         configurations.runtimeClasspath.findAll { !it.path.endsWith(".pom") }.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/mlaikhram/highland-siege")
+            credentials {
+                // You can either store the username and token in ~/.gradle/gradle.properties (use the gpr.user and gpr.key keys)
+                // Or you can store them as environment variables e.g. in ~/.bash_profile or ~/.zsh depending on your shell (GITHUB_USERNAME and GITHUB_TOKEN keys)
+                username = project.findProperty("gpr.user") ?: System.getenv("GITHUB_USERNAME")
+                password = project.findProperty("gpr.key") ?: System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+    publications {
+        gpr(MavenPublication) {
+            groupId = 'mlaikhram.highland-siege'
+            artifactId = 'highland-siege'
+            version = '0.0.1'
+
+            from(components.java)
+        }
     }
 }

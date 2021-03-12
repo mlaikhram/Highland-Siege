@@ -58,6 +58,12 @@ public class GameModeratorListener extends ListenerAdapter {
                 if (!author.isBot() && sourceChannel.getIdLong() == DBUtils.getSpecialChannel(guild.getIdLong(), SpecialChannelType.REGISTRATION) && messageTokens.length >= 2 && messageTokens[0].equalsIgnoreCase("register") && MessageUtils.isUserMention(messageTokens[1])) {
                     try {
                         long botId = MessageUtils.mentionToUserID(messageTokens[1]);
+                        logger.info(messageTokens[1]);
+                        logger.info(botId + "");
+                        logger.info("819787176824012802");
+                         for (Member member : guild.getMembers()) {
+                             logger.info(member.getEffectiveName() + "\t\t" + member.getIdLong());
+                         }
                         User botUser = guild.getMemberById(botId).getUser();
                         if (botUser.isBot()) {// && botId != jda.getSelfUser().getIdLong()) { // TODO: uncomment self check after testing
                             long coachId = DBUtils.getBotCoach(botId);
@@ -75,6 +81,7 @@ public class GameModeratorListener extends ListenerAdapter {
                             throw new Exception("You can only register bots that you make!");
                         }
                     } catch (Exception e) {
+                        e.printStackTrace();
                         sourceChannel.sendMessage(e.getMessage()).queue();
                     }
                 }
